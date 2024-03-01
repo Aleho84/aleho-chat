@@ -1,0 +1,40 @@
+name: deploy_private
+on:
+  push:
+    branches: ["main"]
+
+jobs:
+  deploy:
+    runs-on: self-hosted
+
+    strategy:
+      matrix:
+        node-version: [18.x]
+
+    steps:
+      - run: echo ${{ secrets.SUDO_PSW }} | sudo -S pm2 delete aleho-chat
+        continue-on-error: true
+      - uses: actions/checkout@v4
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v3
+        with:
+          node-version: ${{ matrix.node-version }}
+      - run: npm install
+      - name: Create .env file
+        run: |
+          touch .env
+          echo ALEHOCHAT_PORT=${{ vars.ALEHOCHAT_PORT }} >> .env
+      - name: Copy CSR 
+        run: cp ~/cert.pem ~/git-actions-runner/_work/aleho-chat/aleho-chat/certificates/cert.pem
+      - name: Copy KEY
+        run: cp ~/key.pem ~/git-actions-runner/_work/aleho-chat/aleho-chat/certificates/key.pem
+  start:
+    needs: deploy
+    runs-on: self-hosted
+    steps:
+      - run: echo ${{ secrets.SUDO_PSW }} | sudo -S pm2 start pm2.json
+  test:
+    needs: start
+    runs-on: self-hosted
+    steps:
+      - run: npm run test --if-present
